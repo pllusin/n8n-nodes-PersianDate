@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-persiandate",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "Convert Gregorian dates to Persian (Jalali) calendar in n8n",
   "keywords": [
     "n8n-community-node-package",
