@@ -199,25 +199,6 @@ export class ToJalali implements INodeType {
 				default: 'jalaliDate',
 				description: 'The field name to put the Jalali date output in',
 			},
-			{
-				displayName: 'Include Input',
-				name: 'includeInput',
-				type: 'boolean',
-				default: false,
-				description: 'Whether to include the original input data in the output',
-			},
-			{
-				displayName: 'Input Field Name',
-				name: 'inputFieldName',
-				type: 'string',
-				default: 'input',
-				description: 'The field name to put the original input data in (if included)',
-				displayOptions: {
-					show: {
-						includeInput: [true],
-					},
-				},
-			},
 		],
 	};
 
@@ -277,8 +258,6 @@ export class ToJalali implements INodeType {
 			try {
 				const inputType = this.getNodeParameter('inputType', i) as string;
 				const outputField = this.getNodeParameter('outputField', i, 'jalaliDate') as string;
-				const includeInput = this.getNodeParameter('includeInput', i, false) as boolean;
-				const inputFieldName = this.getNodeParameter('inputFieldName', i, 'input') as string;
 				let mDate: moment.Moment;
 
 				if (inputType === 'complete') {
@@ -423,9 +402,6 @@ export class ToJalali implements INodeType {
 							);
 						}
 					} else {
-						if (includeInput) {
-							newItem.json[inputFieldName] = items[i].json;
-						}
 						returnData.push(newItem);
 						continue;
 					}
@@ -467,6 +443,7 @@ export class ToJalali implements INodeType {
 				const newItem: INodeExecutionData = {
 					json: {
 						[outputField]: jalaliDate,
+						input: items[i].json,
 					},
 				};
 
@@ -493,10 +470,6 @@ export class ToJalali implements INodeType {
 
 				if (additionalOptions.addWeekday) {
 					newItem.json.jalaliWeekday = ToJalali.getPersianWeekday(mDate.day());
-				}
-
-				if (includeInput) {
-					newItem.json[inputFieldName] = items[i].json;
 				}
 
 				returnData.push(newItem);
