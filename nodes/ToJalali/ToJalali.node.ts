@@ -192,6 +192,20 @@ export class ToJalali implements INodeType {
 					},
 				],
 			},
+			{
+				displayName: 'Output Field',
+				name: 'outputField',
+				type: 'string',
+				default: 'jalaliDate',
+				description: 'The field name to put the Jalali date output in',
+			},
+			{
+				displayName: 'Include Input',
+				name: 'includeInput',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to include the original input data in the output',
+			},
 		],
 	};
 
@@ -250,6 +264,8 @@ export class ToJalali implements INodeType {
 		for (let i = 0; i < items.length; i++) {
 			try {
 				const inputType = this.getNodeParameter('inputType', i) as string;
+				const outputField = this.getNodeParameter('outputField', i, 'jalaliDate') as string;
+				const includeInput = this.getNodeParameter('includeInput', i, false) as boolean;
 				let mDate: moment.Moment;
 
 				if (inputType === 'complete') {
@@ -262,7 +278,14 @@ export class ToJalali implements INodeType {
 					}
 
 					// Try different date formats
-					mDate = moment(inputDate as moment.MomentInput);
+					if (/^\d{10,13}$/.test(inputDate.trim())) {
+						// Handle timestamp (seconds or milliseconds)
+						let ts = inputDate.trim();
+						if (ts.length === 10) ts = String(Number(ts) * 1000); // seconds to ms
+						mDate = moment(Number(ts));
+					} else {
+						mDate = moment(inputDate as moment.MomentInput);
+					}
 					if (!mDate.isValid()) {
 						// Try parsing with the English text format directly
 						const match = inputDate.match(/([A-Za-z]+)\s+(\d+)(?:st|nd|rd|th)?\s+(\d+)(?:,\s+(\d+):(\d+):(\d+)\s+(am|pm))?/i);
@@ -379,6 +402,9 @@ export class ToJalali implements INodeType {
 							);
 						}
 					} else {
+						if (includeInput) {
+							newItem.json.input = items[i].json;
+						}
 						returnData.push(newItem);
 						continue;
 					}
@@ -419,7 +445,7 @@ export class ToJalali implements INodeType {
 
 				const newItem: INodeExecutionData = {
 					json: {
-						jalaliDate,
+						[outputField]: jalaliDate,
 					},
 				};
 
@@ -446,6 +472,10 @@ export class ToJalali implements INodeType {
 
 				if (additionalOptions.addWeekday) {
 					newItem.json.jalaliWeekday = ToJalali.getPersianWeekday(mDate.day());
+				}
+
+				if (includeInput) {
+					newItem.json.input = items[i].json;
 				}
 
 				returnData.push(newItem);
