@@ -206,6 +206,18 @@ export class ToJalali implements INodeType {
 				default: false,
 				description: 'Whether to include the original input data in the output',
 			},
+			{
+				displayName: 'Input Field Name',
+				name: 'inputFieldName',
+				type: 'string',
+				default: 'input',
+				description: 'The field name to put the original input data in (if included)',
+				displayOptions: {
+					show: {
+						includeInput: [true],
+					},
+				},
+			},
 		],
 	};
 
@@ -266,51 +278,60 @@ export class ToJalali implements INodeType {
 				const inputType = this.getNodeParameter('inputType', i) as string;
 				const outputField = this.getNodeParameter('outputField', i, 'jalaliDate') as string;
 				const includeInput = this.getNodeParameter('includeInput', i, false) as boolean;
+				const inputFieldName = this.getNodeParameter('inputFieldName', i, 'input') as string;
 				let mDate: moment.Moment;
 
 				if (inputType === 'complete') {
-					const inputDate = this.getNodeParameter('dateValue', i) as string;
-					if (!inputDate) {
+					let inputDate: string | number = this.getNodeParameter('dateValue', i) as string | number;
+					if (inputDate === undefined || inputDate === null || inputDate === '') {
 						throw new NodeOperationError(
 							this.getNode(),
 							'No date value provided',
 						);
 					}
 
-					// Try different date formats
-					if (/^\d{10,13}$/.test(inputDate.trim())) {
-						// Handle timestamp (seconds or milliseconds)
+					if (typeof inputDate === 'number') {
+						// Handle numeric timestamp (seconds or ms)
+						let ts = inputDate;
+						if (ts < 1e11) ts = ts * 1000; // treat as seconds if less than year 5138
+						mDate = moment(ts);
+					} else if (/^\d{10,13}$/.test(inputDate.trim())) {
+						// Handle string timestamp
 						let ts = inputDate.trim();
-						if (ts.length === 10) ts = String(Number(ts) * 1000); // seconds to ms
+						if (ts.length === 10) ts = String(Number(ts) * 1000);
 						mDate = moment(Number(ts));
 					} else {
 						mDate = moment(inputDate as moment.MomentInput);
 					}
 					if (!mDate.isValid()) {
 						// Try parsing with the English text format directly
-						const match = inputDate.match(/([A-Za-z]+)\s+(\d+)(?:st|nd|rd|th)?\s+(\d+)(?:,\s+(\d+):(\d+):(\d+)\s+(am|pm))?/i);
-						if (match) {
-							const [, month, day, year, hour = '0', minute = '0', second = '0', ampm = 'am'] = match;
-							const time24 = moment(`${hour}:${minute}:${second} ${ampm}`, 'h:mm:ss a').format('HH:mm:ss');
-							const dateStr = `${year}-${moment().month(month).format('MM')}-${day.padStart(2, '0')} ${time24}`;
-							mDate = moment(dateStr);
+						if (typeof inputDate === 'string') {
+							const match = inputDate.match(/([A-Za-z]+)\s+(\d+)(?:st|nd|rd|th)?\s+(\d+)(?:,\s+(\d+):(\d+):(\d+)\s+(am|pm))?/i);
+							if (match) {
+								const [, month, day, year, hour = '0', minute = '0', second = '0', ampm = 'am'] = match;
+								const time24 = moment(`${hour}:${minute}:${second} ${ampm}`, 'h:mm:ss a').format('HH:mm:ss');
+								const dateStr = `${year}-${moment().month(month).format('MM')}-${day.padStart(2, '0')} ${time24}`;
+								mDate = moment(dateStr);
+							} else {
+								mDate = moment(inputDate as moment.MomentInput, [
+									'YYYY-MM-DD',
+									'YYYY/MM/DD',
+									'DD-MM-YYYY',
+									'DD/MM/YYYY',
+									'MM-DD-YYYY',
+									'MM/DD/YYYY',
+									'YYYY-MM-DD HH:mm:ss',
+									'YYYY/MM/DD HH:mm:ss',
+									'DD-MM-YYYY HH:mm:ss',
+									'DD/MM/YYYY HH:mm:ss',
+									'MM-DD-YYYY HH:mm:ss',
+									'MM/DD/YYYY HH:mm:ss',
+									'X', // Unix timestamp
+									'YYYY-MM-DDTHH:mm:ss.SSSZ', // ISO 8601
+								]);
+							}
 						} else {
-							mDate = moment(inputDate as moment.MomentInput, [
-								'YYYY-MM-DD',
-								'YYYY/MM/DD',
-								'DD-MM-YYYY',
-								'DD/MM/YYYY',
-								'MM-DD-YYYY',
-								'MM/DD/YYYY',
-								'YYYY-MM-DD HH:mm:ss',
-								'YYYY/MM/DD HH:mm:ss',
-								'DD-MM-YYYY HH:mm:ss',
-								'DD/MM/YYYY HH:mm:ss',
-								'MM-DD-YYYY HH:mm:ss',
-								'MM/DD/YYYY HH:mm:ss',
-								'X', // Unix timestamp
-								'YYYY-MM-DDTHH:mm:ss.SSSZ', // ISO 8601
-							]);
+							mDate = moment(inputDate as moment.MomentInput);
 						}
 					}
 
@@ -403,7 +424,7 @@ export class ToJalali implements INodeType {
 						}
 					} else {
 						if (includeInput) {
-							newItem.json.input = items[i].json;
+							newItem.json[inputFieldName] = items[i].json;
 						}
 						returnData.push(newItem);
 						continue;
@@ -475,7 +496,7 @@ export class ToJalali implements INodeType {
 				}
 
 				if (includeInput) {
-					newItem.json.input = items[i].json;
+					newItem.json[inputFieldName] = items[i].json;
 				}
 
 				returnData.push(newItem);
