@@ -260,12 +260,19 @@ export class ToJalali implements INodeType {
 				const outputField = this.getNodeParameter('outputField', i, 'jalaliDate') as string;
 				let mDate: moment.Moment;
 
+				console.log('INPUT:', items[i].json);
 				if (inputType === 'complete') {
 					let inputDate: string | number = this.getNodeParameter('dateValue', i) as string | number;
-					if (inputDate === undefined || inputDate === null || inputDate === '') {
+					console.log('inputDate:', inputDate);
+					if (
+						inputDate === undefined ||
+						inputDate === null ||
+						inputDate === '' ||
+						(typeof inputDate === 'string' && inputDate.trim().startsWith('{{'))
+					) {
 						throw new NodeOperationError(
 							this.getNode(),
-							'No date value provided',
+							'No valid date value provided (check your input or expression)',
 						);
 					}
 
